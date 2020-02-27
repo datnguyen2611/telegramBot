@@ -33,7 +33,7 @@ class UpdateMessageController extends Controller
             $data = $telegram->handleGetUpdates();
             //check buoi toi
             $day = 'sáng';
-            $chatId = '-549030259';
+            $chatId = '-339631790';
             $checkreport = $this->checkReport($day, $chatId);
             $this->sendmessage($checkreport);
         } catch (\Longman\TelegramBot\Exception\TelegramException $e) {
@@ -42,7 +42,7 @@ class UpdateMessageController extends Controller
         }
     }
 
-    private function sendmessage($message ,$chatId)
+    private function sendmessage($message, $chatId)
     {
         $a = new \Longman\TelegramBot\Request();
         $result = $a->sendMessage([
@@ -76,12 +76,11 @@ class UpdateMessageController extends Controller
             }
             if ($isAfternoon) {
                 $userReportToi[] = $val->id;
-
             }
         }
 
 //        $message = $this->getUsersNotReport($day, $chatId , $userReportSang , $userReportToi);
-        $message = $this->getUsersNotReport($day, $chatId,$userReportSang,$userReportToi);
+        $message = $this->getUsersNotReport($day, $chatId, $userReportSang, $userReportToi);
         echo "<pre>";
         print_r($message);
         die();
@@ -92,7 +91,7 @@ class UpdateMessageController extends Controller
     {
         $time1 = Carbon::parse($time1);
         $time2 = Carbon::parse($time2);
-       return  $time1->lt($time2);
+        return $time1->lt($time2);
     }
 
     private function checkTimeToi($time1, $time2)
@@ -156,7 +155,7 @@ class UpdateMessageController extends Controller
         return $str;
     }
 
-    private function getUsersNotReport($day, $chatId,$userNotReportSang,$userNotReportToi)
+    private function getUsersNotReport($day, $chatId, $userNotReportSang, $userNotReportToi)
     {
         $data = DB::table('user_chat')
             ->join('user', 'user.id', 'user_chat.user_id')
@@ -169,27 +168,22 @@ class UpdateMessageController extends Controller
         $userNotReportSang = $data->whereNotIn('user.id', $userNotReportSang)->get()->toArray();
         $userNotReportToi = $data->whereNotIn('user.id', $userNotReportToi)->get()->toArray();
         $message = "";
-//        $dateZone = Carbon::now('Asia/Ho_Chi_Minh');
+        $dateZone = Carbon::now('Asia/Ho_Chi_Minh');
         $timeZone = Carbon::now()->toTimeString();
-        if ($userNotReportSang && $timeZone <'09:00:00'){
+        if ($userNotReportSang && $timeZone > '09:30:00') {
             foreach ($userNotReportSang as $val) {
                 $day = 'Sáng';
                 $text = $val->first_name . " " . $val->last_name . " : chưa bảo cáo buổi $day" . "\n";
                 $message .= $text;
             }
         }
-        if ($userNotReportToi && $timeZone >'20:00:00'){
+        if ($userNotReportToi && $timeZone > '20:00:00') {
             foreach ($userNotReportToi as $val) {
                 $day = 'Tối';
                 $text = $val->first_name . " " . $val->last_name . " : chưa bảo cáo buổi $day" . "\n";
                 $message .= $text;
             }
         }
-//        foreach ($data as $val) {
-//            $text = $val->first_name . " " . $val->last_name . " : chưa bảo cáo buổi $day" . "\n";
-//            $message .= $text;
-//        }
-        echo "Sussess!";
         return $message;
     }
 
