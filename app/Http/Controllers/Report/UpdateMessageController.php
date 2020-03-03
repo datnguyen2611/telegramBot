@@ -14,8 +14,8 @@ class UpdateMessageController extends Controller
 
     public function updateMessage()
     {
-        date_default_timezone_set('Asia/Bangkok');
-        $a = new \Longman\TelegramBot\Request();
+        date_default_timezone_set('Asia/Ho_Chi_Minh');
+
         $bot_api_key = '1065422651:AAG5xftZNiwBVs8-c40qVpOood1K-tg6qGY';
         $bot_username = 'TheSmartMovebot';
         $mysql_credentials = [
@@ -32,10 +32,13 @@ class UpdateMessageController extends Controller
             $telegram->enableMySql($mysql_credentials);
             $data = $telegram->handleGetUpdates();
             //check buoi toi
-            $day = 'sáng';
-            $chatId = '-339631790';
-            $checkreport = $this->checkReport($day, $chatId);
-            $this->sendmessage($checkreport);
+            $time = 'AM'; // PM
+            $chat_id = '-452474869';
+            $check_report = $this->checkReport($time, $chat_id);
+            echo '<pre>';
+            print_r($check_report);
+            die();
+            $this->sendmessage($check_report, $chat_id);
         } catch (\Longman\TelegramBot\Exception\TelegramException $e) {
             // log telegram errors
             // echo $e->getMessage();
@@ -55,8 +58,7 @@ class UpdateMessageController extends Controller
     private function checkReport($day, $chatId)
     {
         $dateZone = Carbon::now('Asia/Ho_Chi_Minh');
-        $today = $dateZone->toDateString();
-        $realTime = $dateZone->toTimeString();
+
         $data = DB::table('message')
             ->join('user', 'user.id', 'message.user_id')
             ->join('chat', 'chat.id', 'message.chat_id')
@@ -64,53 +66,64 @@ class UpdateMessageController extends Controller
             ->where('message.chat_id', $chatId)
             ->select(['user.id', 'user.first_name', 'user.last_name', 'message.text', 'chat_id', 'message.date'])
             ->get()->toArray();
-        $userReportSang = [];
-        $userReportToi = [];
+
+        /* @todo: sua tien bien */
+        $userReportMorning = [];
+        $userReportAfternoon = [];
+        $timeReportMorning = [];
+        $timeReportNight = [];
+
+        #var_dump($data);die;
 
         foreach ($data as $val) {
-            $isMorning = $this->checkBaoCaoBuoiSang($val->text, $val->date);
-            $isAfternoon = $this->checkBaoCaoBuoiChieu($val->text, $val->date);
+            $isLateMorning = $this->checkBaoCaoBuoiSang($val->text, $val->date);
+            $isLateAfternoon = $this->checkBaoCaoBuoiChieu($val->text, $val->date);
+
 //            $userReportSang[] = $isMorning;
-            if ($isMorning) {
-                $userReportSang[] = $val->id;
+            if ($isLateMorning) {
+                $userReportMorning[] = $val->id;
+
             }
-            if ($isAfternoon) {
-                $userReportToi[] = $val->id;
+            if ($isLateAfternoon) {
+                $userReportAfternoon[] = $val->id;
+
             }
         }
 
-//        $message = $this->getUsersNotReport($day, $chatId , $userReportSang , $userReportToi);
-        $message = $this->getUsersNotReport($day, $chatId, $userReportSang, $userReportToi);
-        echo "<pre>";
-        print_r($message);
-        die();
+        $userReportMorning = array_unique($userReportMorning);
+        $userReportAfternoon = array_unique($userReportAfternoon);
+        $message = $this->getUsersNotReport
+        ($chatId, $userReportMorning, $userReportAfternoon);
+
+//        var_dump($userReportAfternoon);die;
+
         return $message;
     }
 
-    private function checkTimeSang($time1, $time2)
+    private function checkTimeMorning($time1, $time2)
     {
-        $time1 = Carbon::parse($time1);
-        $time2 = Carbon::parse($time2);
-        return $time1->lt($time2);
+        $time = date("H:i:s", strtotime($time1));
+        return $time < $time2;
     }
 
-    private function checkTimeToi($time1, $time2)
+    private function checkTimeNight($time1, $time2)
     {
-        $time1 = Carbon::parse($time1);
-        $time2 = Carbon::parse($time2);
-        return $time1->gt($time2);
+        $time = date("h:i:s", strtotime($time1));
+        return $time > $time2;
     }
 
     private function checkBaoCaoBuoiSang($message, $timeMessage)
     {
         $flag = false;
+
         $message = $this->vn_to_str($message);
         $message = strtolower($message);
         $message = trim(preg_replace('/\s+/', ' ', $message));
-        $text = "cong_viec_cua_em";
-        $before12 = $this->checkTimeSang($timeMessage, '09:00:00');
-        if (strpos("$message", "$text") !== false && $before12 !== false) {
+        $text = "cong viec cua em";
+        $before12 = $this->checkTimeMorning($timeMessage, '12:00:00');
+        if (strpos($message, $text) !== false && $before12) {
             $flag = true;
+            echo 'sang';
         }
         return $flag;
     }
@@ -121,11 +134,11 @@ class UpdateMessageController extends Controller
         $message = $this->vn_to_str($message);
         $message = strtolower($message);
         $message = trim(preg_replace('/\s+/', ' ', $message));
-        $text = "cong_viec_hoan_thanh";
-        $before12 = $this->checkTimeToi($timeMessage, '15:00:00');
-
-        if (strpos("$message", "$text") !== false && $before12 !== false) {
+        $text = "cong viec hoan thanh";
+        $after20 = $this->checkTimeNight($timeMessage, '20:00:00');
+        if (strpos($message, $text) !== false && $after20) {
             $flag = true;
+            echo 'chieu';
         }
         return $flag;
     }
@@ -151,11 +164,10 @@ class UpdateMessageController extends Controller
         foreach ($unicode as $nonUnicode => $uni) {
             $str = preg_replace("/($uni)/i", $nonUnicode, $str);
         }
-        $str = str_replace(' ', '_', $str);
-        return $str;
+        return preg_replace('/\s+/', ' ', $str);
     }
 
-    private function getUsersNotReport($day, $chatId, $userNotReportSang, $userNotReportToi)
+    private function getUsersNotReport($chatId, $userNotReportMorning, $userNotReportNight)
     {
         $data = DB::table('user_chat')
             ->join('user', 'user.id', 'user_chat.user_id')
@@ -163,25 +175,29 @@ class UpdateMessageController extends Controller
             ->where('user.is_bot', 0)
             ->where('has_report', 0)
             ->where('user_chat.chat_id', $chatId)
-            ->select('user.first_name', 'user.last_name');
-//            ->get()->toArray();
-        $userNotReportSang = $data->whereNotIn('user.id', $userNotReportSang)->get()->toArray();
-        $userNotReportToi = $data->whereNotIn('user.id', $userNotReportToi)->get()->toArray();
+            ->select('user.first_name', 'user.last_name', 'user.id');
+        echo '<pre>';
+        $userIdsNotReportNight = $data->whereNotIn('user.id', $userNotReportNight)->get()->toArray();
+        $userIdsNotReportMorning = $data->whereNotIn('user.id', $userNotReportMorning)->get()->toArray();
+
         $message = "";
-        $dateZone = Carbon::now('Asia/Ho_Chi_Minh');
-        $timeZone = Carbon::now()->toTimeString();
-        if ($userNotReportSang && $timeZone > '09:30:00') {
-            foreach ($userNotReportSang as $val) {
+        echo '<pre>';
+        print_r($userIdsNotReportNight);
+        die();
+        if (count($userIdsNotReportMorning) && $checkTimeMorning) {
+            $message .= "Báo cáo buổi sáng: " . PHP_EOL;
+            foreach ($userIdsNotReportMorning as $val) {
                 $day = 'Sáng';
                 $text = $val->first_name . " " . $val->last_name . " : chưa bảo cáo buổi $day" . "\n";
-                $message .= $text;
+                $message .= "   " . $text;
             }
         }
-        if ($userNotReportToi && $timeZone > '20:00:00') {
-            foreach ($userNotReportToi as $val) {
+        if (count($userIdsNotReportNight) && $checkTimeNight) {
+            $message .= "Báo cáo buổi tối: " . PHP_EOL;
+            foreach ($userIdsNotReportNight as $val) {
                 $day = 'Tối';
                 $text = $val->first_name . " " . $val->last_name . " : chưa bảo cáo buổi $day" . "\n";
-                $message .= $text;
+                $message .= "   " . $text;
             }
         }
         return $message;

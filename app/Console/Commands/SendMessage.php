@@ -43,4 +43,8 @@ class SendMessage extends Command
     {
         app("App\Http\Controllers\Report\UpdateMessageController")->updateMessage();
     }
+
+    protected function getNewMessages($date) {
+        /** Lay cac messages o trong Group Chat, vao ngay $date */
+    }
 }
